@@ -1,11 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace WebApplication.Models
+namespace WebApplicationAPI.Services
 {
     // SECURITY FIX: Input validation model example
     // This demonstrates proper input validation to prevent injection attacks
     // Never trust user input - always validate on the server side
-    public class UserInputModel
+    public class UserInputValidation
     {
         // SECURITY FIX: Email validation with regex pattern
         // Prevents invalid email formats and potential injection attempts

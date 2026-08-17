@@ -61,15 +61,15 @@ public class SecurityHeadersMiddleware
             // ---------------------------------------------------------------------
 
             //            Application
-            //                 │
-            //   ┌──────────────┼─────────────-─┐
+            //                   │
+            //    ┌──────────────┼─────────────-─┐
             //    │              │               │
             //    MVC API           Scalar
             //      │              │               │
-            //     / Home / api / v1 / scalar / v1
-            //      / Products / api / v1 / ...      │
-            //         │              │               │
-            //      Strict CSP    Strict CSP      Scalar CSP
+            //    / Home / api / v1 / scalar / v1
+            //    / Products / api / v1 / ...      │
+            //        │            │               │
+            //    Strict CSP    Strict CSP      Scalar CSP
 
             if (!headers.ContainsKey("Content-Security-Policy"))
             {

@@ -1,28 +1,33 @@
+using Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
-using WebApplicationAPI.Models.AuthAndUser;
 
 namespace WebApplicationAPI.Services;
 
 public interface ITokenService
 {
-    (string token, DateTimeOffset expiresAt) GenerateAccessToken(User user);
+    (string token, DateTimeOffset expiresAt) GenerateAccessToken(ApplicationUser user, IList<string> roles);
     string GenerateRefreshToken();
+    Task<string> GenerateTokenAsync(ApplicationUser user);
+
 }
 
 public class TokenService : ITokenService
 {
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly IConfiguration _config;
 
-    public TokenService(IConfiguration config)
+    public TokenService(UserManager<ApplicationUser> userManager, IConfiguration config)
     {
+        _userManager = userManager;
         _config = config;
     }
 
-    public (string token, DateTimeOffset expiresAt) GenerateAccessToken(User user)
+    public (string token, DateTimeOffset expiresAt) GenerateAccessToken(ApplicationUser user, IList<string> roles)
     {
         var jwtSection = _config.GetSection("Jwt");
         var key = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
@@ -30,13 +35,13 @@ public class TokenService : ITokenService
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? ""),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(ClaimTypes.Name, user.Email),
-            new("full_name", user.FullName),
+            new(ClaimTypes.Name, user.Email ?? ""),
+            new("full_name", user.FullName ?? ""),
         };
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
@@ -53,6 +58,35 @@ public class TokenService : ITokenService
         );
 
         return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    public async Task<string> GenerateTokenAsync(ApplicationUser user)
+    {
+        var userClaims = await _userManager.GetClaimsAsync(user);
+        var roles = await _userManager.GetRolesAsync(user);
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
+        };
+
+        claims.AddRange(userClaims); // هنا بتتحط الـ Permission claims
+
+        foreach (var role in roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _config["Jwt:Issuer"],
+            audience: _config["Jwt:Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(2),
+            signingCredentials: creds);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     public string GenerateRefreshToken()

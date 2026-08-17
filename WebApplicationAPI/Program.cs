@@ -1,12 +1,16 @@
-using System.Threading.RateLimiting;
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
+using Infrastructure.DbContext;
+using Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
 using WebApplicationAPI.Controllers;
 using WebApplicationAPI.Extensions;
 using WebApplicationAPI.Filters;
 using WebApplicationAPI.Middleware;
 using WebApplicationAPI.Services;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // ---------------------------------------------------------------------
@@ -64,7 +68,28 @@ builder.Services.AddStrictHsts();
 // // --- Auth building blocks (swap in-memory implementations for real
 // //    repositories backed by your database when ready) ---
 // ---------------------------------------------------------------------
-builder.Services.AddSingleton<IUserStore, InMemoryUserStore>();
+builder.Services.AddDbContext<Infrastructure.DbContext.AppDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequiredLength = 8;
+
+    // Lockout settings
+    options.Lockout.DefaultLockoutTimeSpan = System.TimeSpan.FromMinutes(15);
+    options.Lockout.MaxFailedAccessAttempts = 10;
+    options.Lockout.AllowedForNewUsers = true;
+
+    // User settings
+    options.User.RequireUniqueEmail = true;
+})
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
+
 builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 

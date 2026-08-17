@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Identity;
+using Infrastructure.Identity;
 using WebApplicationAPI.Models.AuthAndUser;
 using WebApplicationAPI.Services;
 
@@ -10,20 +12,20 @@ namespace WebApplicationAPI.Controllers;
 [Route("api/v1/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly IUserStore _userStore;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenStore _refreshTokenStore;
     private readonly IConfiguration _config;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
-        IUserStore userStore,
+        UserManager<ApplicationUser> userManager,
         ITokenService tokenService,
         IRefreshTokenStore refreshTokenStore,
         IConfiguration config,
         ILogger<AuthController> logger)
     {
-        _userStore = userStore;
+        _userManager = userManager;
         _tokenService = tokenService;
         _refreshTokenStore = refreshTokenStore;
         _config = config;
@@ -36,12 +38,10 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     [EnableRateLimiting("auth")]
     [AllowAnonymous]
-    public IActionResult Register([FromBody] RegisterUserRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterUserRequest request)
     {
-        if (_userStore.FindByEmail(request.Email) is not null)
+        if (await _userManager.FindByEmailAsync(request.Email) is not null)
         {
-            // Same generic message as a failed login would give — avoid
-            // confirming/denying account existence to an anonymous caller.
             return Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
@@ -49,22 +49,38 @@ public class AuthController : ControllerBase
             });
         }
 
-        var user = _userStore.Create(request.Email, request.Password, request.FullName);
+        var user = new ApplicationUser
+        {
+            UserName = request.Email,
+            Email = request.Email,
+            FullName = request.FullName
+        };
+
+        var result = await _userManager.CreateAsync(user, request.Password);
+        
+        if (!result.Succeeded)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Registration failed.",
+                Detail = string.Join(", ", result.Errors.Select(e => e.Description))
+            });
+        }
+
         _logger.LogInformation("New user registered: {UserId}", user.Id);
 
-        var tokens = IssueTokenPair(user);
+        var tokens = await IssueTokenPair(user);
         return CreatedAtAction(nameof(Me), tokens);
     }
 
     [HttpPost("login")]
     [EnableRateLimiting("auth")]
     [AllowAnonymous]
-    public IActionResult Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var user = _userStore.FindByEmail(request.Email);
+        var user = await _userManager.FindByEmailAsync(request.Email);
 
-        // Deliberately identical response whether the email doesn't exist or
-        // the password is wrong — don't leak which one it was.
         var invalidCredentials = Unauthorized(new ProblemDetails
         {
             Status = StatusCodes.Status401Unauthorized,
@@ -76,7 +92,7 @@ public class AuthController : ControllerBase
             return invalidCredentials;
         }
 
-        if (_userStore.IsLockedOut(user))
+        if (await _userManager.IsLockedOutAsync(user))
         {
             _logger.LogWarning("Login attempt for locked-out account: {UserId}", user.Id);
             return Unauthorized(new ProblemDetails
@@ -86,21 +102,21 @@ public class AuthController : ControllerBase
             });
         }
 
-        if (!_userStore.VerifyPassword(user, request.Password))
+        if (!await _userManager.CheckPasswordAsync(user, request.Password))
         {
-            _userStore.RegisterFailedAttempt(user);
+            await _userManager.AccessFailedAsync(user);
             return invalidCredentials;
         }
 
-        _userStore.ResetFailedAttempts(user);
-        var tokens = IssueTokenPair(user);
+        await _userManager.ResetAccessFailedCountAsync(user);
+        var tokens = await IssueTokenPair(user);
         return Ok(tokens);
     }
 
     [HttpPost("refresh")]
     [EnableRateLimiting("auth")]
     [AllowAnonymous]
-    public IActionResult Refresh([FromBody] RefreshTokenRequest request)
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request)
     {
         var entry = _refreshTokenStore.Validate(request.RefreshToken);
         if (entry is null)
@@ -112,10 +128,9 @@ public class AuthController : ControllerBase
             });
         }
 
-        // Refresh tokens are rotated: the old one is revoked and a new pair issued.
         _refreshTokenStore.Revoke(request.RefreshToken);
 
-        var owner = _userStore.FindById(entry.UserId);
+        var owner = await _userManager.FindByIdAsync(entry.UserId);
         if (owner is null)
         {
             return Unauthorized(new ProblemDetails
@@ -125,7 +140,7 @@ public class AuthController : ControllerBase
             });
         }
 
-        var tokens = IssueTokenPair(owner);
+        var tokens = await IssueTokenPair(owner);
         return Ok(tokens);
     }
 
@@ -151,9 +166,10 @@ public class AuthController : ControllerBase
         });
     }
 
-    private TokenResponse IssueTokenPair(User user)
+    private async Task<TokenResponse> IssueTokenPair(ApplicationUser user)
     {
-        var (accessToken, expiresAt) = _tokenService.GenerateAccessToken(user);
+        var roles = await _userManager.GetRolesAsync(user);
+        var (accessToken, expiresAt) = _tokenService.GenerateAccessToken(user, roles);
         var refreshToken = _tokenService.GenerateRefreshToken();
         _refreshTokenStore.Store(refreshToken, user.Id, RefreshTokenLifetime);
 

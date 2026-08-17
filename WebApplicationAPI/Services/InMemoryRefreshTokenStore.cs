@@ -2,14 +2,14 @@ using System.Collections.Concurrent;
 
 namespace WebApplicationAPI.Services;
 
-public record RefreshTokenEntry(Guid UserId, DateTimeOffset ExpiresAt, bool Revoked);
+public record RefreshTokenEntry(string UserId, DateTimeOffset ExpiresAt, bool Revoked);
 
 public interface IRefreshTokenStore
 {
-    void Store(string token, Guid userId, TimeSpan lifetime);
+    void Store(string token, string userId, TimeSpan lifetime);
     RefreshTokenEntry? Validate(string token);
     void Revoke(string token);
-    void RevokeAllForUser(Guid userId);
+    void RevokeAllForUser(string userId);
 }
 
 /// <summary>
@@ -21,7 +21,7 @@ public class InMemoryRefreshTokenStore : IRefreshTokenStore
 {
     private readonly ConcurrentDictionary<string, RefreshTokenEntry> _tokens = new();
 
-    public void Store(string token, Guid userId, TimeSpan lifetime)
+    public void Store(string token, string userId, TimeSpan lifetime)
     {
         _tokens[token] = new RefreshTokenEntry(userId, DateTimeOffset.UtcNow.Add(lifetime), Revoked: false);
     }
@@ -41,7 +41,7 @@ public class InMemoryRefreshTokenStore : IRefreshTokenStore
         }
     }
 
-    public void RevokeAllForUser(Guid userId)
+    public void RevokeAllForUser(string userId)
     {
         foreach (var kvp in _tokens.Where(t => t.Value.UserId == userId && !t.Value.Revoked))
         {

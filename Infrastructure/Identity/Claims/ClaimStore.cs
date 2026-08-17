@@ -29,5 +29,9 @@ namespace Infrastructure.Identity.Claims
             new Claim("SendMessages", "إرسال الرسائل")
         };
 
+        public static List<Claim> WeatherForecast = new List<Claim>
+        {
+            new Claim("GetWeatherForecast", "عرض الطقس"),
+        };
     }
 }
