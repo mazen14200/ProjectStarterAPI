@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.2.0" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.10" />
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Features\Users\" />
+    <Folder Include="Features\Roles\" />
+    <Folder Include="Validators\" />
+  </ItemGroup>
+
+</Project>

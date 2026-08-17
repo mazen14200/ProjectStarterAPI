@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>1c4eaa5e-d45e-4cfa-950c-9a01238014ab</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoMapper" Version="16.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <PackageReference Include="NuGet.Packaging" Version="6.12.5" PrivateAssets="all" />
+    <PackageReference Include="NuGet.Protocol" Version="6.12.5" PrivateAssets="all" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
